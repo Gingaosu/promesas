@@ -55,79 +55,76 @@
 
 {% block javascript %}
 <script>
-    $(document).ready(function () {
-        /*
-            On submiting the form, send the POST ajax
-            request to server and after successfull submission
-            display the object.
-        */
-        $("#friend-form").submit(function (e) {
-            // preventing from page reload and default actions
+    document.addEventListener('DOMContentLoaded', function () {
+        const friendForm = document.getElementById('friend-form');
+    
+        friendForm.addEventListener('submit', async function (e) {
             e.preventDefault();
-            // serialize the data for sending the form data.
-            var serializedData = $(this).serialize();
-            console.log(serializedData)
-            // make POST ajax call
-            $.ajax({
-                type: 'POST',
-                url: "{% url 'post_friend' %}",
-                data: serializedData,
-                success: function (response) {
-                    // on successfull creating object
-                    // 1. clear the form.
-                    $("#friend-form").trigger('reset');
-                    // 2. focus to nickname input 
-                    $("#id_nick_name").focus();
 
-                    // display the newly friend to table.
-                    var instance = JSON.parse(response["instance"]);
-                    var fields = instance[0]["fields"];
-                    $("#my_friends tbody").prepend(
-                        `<tr>
-                        <td>${fields["nick_name"]||""}</td>
-                        <td>${fields["first_name"]||""}</td>
-                        <td>${fields["last_name"]||""}</td>
-                        <td>${fields["likes"]||""}</td>
-                        <td>${fields["dob"]||""}</td>
-                        <td>${fields["lives_in"]||""}</td>
-                        </tr>`
-                    )
-                },
-                error: function (response) {
-                    // alert the error if any error occured
-                    alert(response["responseJSON"]["error"]);
-                }
-            })
-        })
-
-        /*
-        On focus out on input nickname,
-        call AJAX get request to check if the nickName
-        already exists or not.
-        */
-        $("#id_nick_name").focusout(function (e) {
-            e.preventDefault();
-            // get the nickname
-            var nick_name = $(this).val();
-            // GET AJAX request
-            $.ajax({
-                type: 'GET',
-                url: "{% url 'validate_nickname' %}",
-                data: {"nick_name": nick_name},
-                success: function (response) {
-                    // if not valid user, alert the user
-                    if(!response["valid"]){
-                        alert("You cannot create a friend with same nick name");
-                        var nickName = $("#id_nick_name");
-                        nickName.val("")
-                        nickName.focus()
+            const formData = new FormData(friendForm);
+    
+            try {
+                const response = await fetch("{% url 'post_friend' %}", {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     }
-                },
-                error: function (response) {
-                    console.log(response)
+                });
+    
+                if (!response.ok) {
+                    throw new Error('Error en la creación del amigo');
                 }
-            })
-        })
-    })
+    
+                const data = await response.json();
+    
+                friendForm.reset();
+                document.getElementById('id_nick_name').focus();
+    
+                const instance = JSON.parse(data["instance"]);
+                const fields = instance[0]["fields"];
+                const newRow = `<tr>
+                    <td>${fields["nick_name"] || ""}</td>
+                    <td>${fields["first_name"] || ""}</td>
+                    <td>${fields["last_name"] || ""}</td>
+                    <td>${fields["likes"] || ""}</td>
+                    <td>${fields["dob"] || ""}</td>
+                    <td>${fields["lives_in"] || ""}</td>
+                </tr>`;
+                document.querySelector('#my_friends tbody').insertAdjacentHTML('afterbegin', newRow);
+    
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al crear el amigo');
+            }
+        });
+    
+        const nickNameInput = document.getElementById('id_nick_name');
+        nickNameInput.addEventListener('blur', async function (e) {
+            e.preventDefault();
+    
+            const nick_name = nickNameInput.value;
+    
+            try {
+                const response = await fetch("{% url 'validate_nickname' %}?nick_name=" + encodeURIComponent(nick_name));
+    
+                if (!response.ok) {
+                    alert('Error en la validación del apodo');
+                }
+    
+                const data = await response.json();
+
+                if (!data["valid"]) {
+                    alert("No puedes crear un amigo con el mismo apodo");
+                    nickNameInput.value = "";
+                    nickNameInput.focus();
+                }
+    
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+    });
+    
 </script>
 {% endblock javascript %}
